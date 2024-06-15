@@ -1,0 +1,163 @@
+# Intro to Data Science - HW 9
+##### Copyright Jeffrey Stanton, Jeffrey Saltz, Christopher Dunham, and Jasmina Tacheva
+
+
+```{r}
+# Enter your name here: Sana Khan
+```
+
+### Attribution statement: (choose only one and delete the rest)
+
+
+```{r}
+# 1. I did this homework by myself, with help from the book and the professor.
+```
+
+**Text mining** plays an important role in many industries because of the prevalence of text in the interactions between customers and company representatives. Even when the customer interaction is by speech, rather than by chat or email, speech to text algorithms have gotten so good that transcriptions of these spoken word interactions are often available. To an increasing extent, a data scientist needs to be able to wield tools that turn a body of text into actionable insights. In this homework, we explore a real **City of Syracuse dataset** using the **quanteda** and **quanteda.textplots** packages. Make sure to install the **quanteda** and **quanteda.textplots** packages before following the steps below:<br>
+```{r}
+library(quanteda)
+library(quanteda.textplots)
+library(tidyverse)
+library(quanteda.textstats)
+```
+
+
+## Part 1: Load and visualize the data file  
+A.	Take a look at this article: https://samedelstein.medium.com/snowplow-naming-contest-data-2dcd38272caf and write a comment in your R script, briefly describing what it is about.<br>
+
+
+```{r}
+#This article is about the city of Syracuse and the contest to name 10 new snowplows. The author mentions how John Oliver did not like the winning names so the author obtained the data on the submissions and made observations about the submissions. The observations include the most popular submissions, as well as an anonymized names to see how many submissions a requestor made. 
+```
+
+B.	Read the data from the following URL into a dataframe called **df**:
+https://intro-datascience.s3.us-east-2.amazonaws.com/snowplownames.csv
+
+
+```{r}
+df <- read_csv("https://intro-datascience.s3.us-east-2.amazonaws.com/snowplownames.csv")
+```
+
+C.	Inspect the **df** dataframe – which column contains an explanation of the meaning of each submitted snowplow name? Transform that column into a **document-feature matrix**, using the **corpus()**, **tokens()**, **tokens_select(), and **dfm()** functions. Do not forget to **remove stop words**.
+
+Hint: Make sure you have libraried *quanteda*
+
+
+```{r}
+ glimpse(df)
+#Column 4 (meaning) contains the meaning of each submitted snowplow name
+snow_submission <- corpus(df$meaning, docnames=df$submission_number) 
+toks <- tokens(snow_submission, remove_punct=TRUE) 
+toks_nostop <- tokens_select(toks, pattern = stopwords("en"), selection = "remove") 
+snow_submissions <- dfm(toks_nostop)
+snow_submissions
+```
+
+D.	Plot a **word cloud**, where a word is only represented if it appears **at least 2 times** . **Hint:** use **textplot_wordcloud()**:
+
+Hint: Make sure you have libraried (and installed if needed) *quanteda.textplots* 
+
+
+```{r}
+textplot_wordcloud(snow_submissions, min_count = 2)
+
+```
+
+E.	Next, **increase the minimum count to 10**. What happens to the word cloud? **Explain in a comment**. 
+
+
+```{r}
+textplot_wordcloud(snow_submissions, min_count = 10)
+#The size of the word cloud decreases, because there are less words that appear at least 10 times
+
+```
+
+F.	What are the top words in the word cloud? Explain in a brief comment.
+
+
+```{r}
+#snow, 1/2, syracuse, plows, Columbus, ï, name,
+
+
+ 
+```
+
+## Part 2: Analyze the sentiment of the descriptions
+
+A.	Create a **named list of word counts by frequency**.<br>
+
+output the 10 most frequent words (their word count and the word). <br>
+
+**Hint**: use **textstat_frequency()** from the *quanteda.textstats* package.
+
+
+```{r}
+textstat_frequency(snow_submissions,10)
+
+```
+
+B.	Explain in a comment what you observed in the sorted list of word counts. 
+
+
+```{r}
+
+```
+
+## Part 3: Match the words with positive and negative words 
+
+A.	Read in the list of positive words, using the scan() function, and output the first 5 words in the list. Do the same for the  the negative words list: <br>
+<br>
+https://intro-datascience.s3.us-east-2.amazonaws.com/positive-words.txt
+<br>
+https://intro-datascience.s3.us-east-2.amazonaws.com/negative-words.txt <br>
+<br>
+
+There should be 2006 positive words and 4783 negative words, so you may need to clean up these lists a bit. 
+
+
+```{r}
+URL <- "https://intro-datascience.s3.us-east-2.amazonaws.com/positive-words.txt" 
+posWords <- scan(URL, character(0), sep = "\n") 
+posWords <- posWords[-1:-34] 
+
+URL <- "https://intro-datascience.s3.us-east-2.amazonaws.com/negative-words.txt" 
+negWords <- scan(URL, character(0), sep = "\n") 
+negWords <- negWords[-1:-34] 
+```
+
+B.	Use **dfm_match()** to match the words in the dfm with the words in posWords). Note that **dfm_match()** creates a new dfm.
+
+Then pass this new dfm to the **textstat_frequency()** function to see the positive words in our corpus, and how many times each word was mentioned.
+
+
+```{r}
+posDFM <- dfm_match(snow_submissions, posWords) 
+
+posFreq <- textstat_frequency(posDFM)
+posFreq
+```
+
+C. Sum all the positive words
+
+
+```{r}
+sum(posDFM)
+```
+
+D. Do a similar analysis for the negative words - show the 10 most requent negative words and then sum the negative words in the document.
+
+
+```{r}
+negDFM <- dfm_match(snow_submissions, negWords) 
+negFreq <- textstat_frequency(negDFM)
+negFreq
+sum(negDFM)
+
+```
+
+E.	Write a comment describing what you found after matching positive and negative words. Which group is more common in this dataset? Might some of the negative words not actually be used in a negative way?  What about the positive words?
+
+
+```{r}
+#Positive words occur more frequently almost 4 times more than negative words. Some of the negative words when looked at alone don't see to be negative but in context to the submission they could be negative. Viewing just the positive words without context is similiar. It's hard to say that those are positive words without seeing them in their context. 
+```

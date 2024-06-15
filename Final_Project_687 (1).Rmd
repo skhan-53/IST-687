@@ -1,0 +1,514 @@
+---
+title: "687 Final Project - Group 4"
+---
+
+Install and load packges 
+```{r}
+install.packages("tidyverse")
+install.packages("sqldf")
+install.packages("dplyr")
+
+library(kernlab)
+library(readr)
+library(caret)
+library(e1071)
+library(rpart.plot)
+library(tidyverse)
+library(sqldf)
+library(dplyr)
+```
+
+
+Load data and assign to new variables 
+```{r}
+app_record <-read.csv("/Users/sanakhan/Downloads/application_record.csv")
+credit_record  <-read.csv("/Users/sanakhan/Downloads/credit_record.csv")
+
+
+cr <- credit_record
+ar <- app_record
+```
+
+
+Add an age column to the application record dataframe and transform column to integer 
+```{r}
+ar$AGE <- ar$DAYS_BIRTH / 365
+
+ar$emp_length = ar$DAYS_EMPLOYED/365 
+
+glimpse(ar)
+head(ar)
+```
+
+```{r}
+ ar %>% count(ID)
+table(ar['CODE_GENDER'])
+
+
+
+```
+
+
+```{r}
+cr$STATUS <- factor(cr$STATUS, levels=c("X", "C", "0", "1", "2", "3", "4", "5"))
+status_factor_level <- c("X", "C", "0", "1", "2", "3", "4", "5")
+status_level <- c(0, 0, 1, 2, 3, 4, 5, 6)
+cr$status_level <- status_level[match(cr$STATUS, status_factor_level)]
+
+
+
+```
+
+View the months a balance was carried and the average monthhs a balance was carried
+```{r}
+cr_history <- cr %>% group_by(ID) %>% summarize(n_obs=n())
+
+hist(cr_history$n_obs)
+mean(cr_history$n_obs)
+```
+
+
+
+
+```{r}
+status_hist <- cr %>% group_by(STATUS) %>% summarize(n_obs=n())
+status_hist 
+
+```
+
+
+
+
+Data Exploration
+```{r}
+#Comparing housing with income 
+ar  %>%
+  group_by( NAME_HOUSING_TYPE) %>%
+  summarise(AVG_INCOME =mean(AMT_INCOME_TOTAL))
+
+#Comparing number of children with income 
+
+ar  %>% 
+  group_by(CNT_CHILDREN)  %>% 
+  summarise(mean(AMT_INCOME_TOTAL))
+
+#plot to show number of children with income level 
+ar %>%
+  ggplot(aes(x = CNT_CHILDREN , y=  AMT_INCOME_TOTAL)) + 
+  geom_point(color = "blue")
+
+
+
+
+```
+```{r}
+#merge datasets
+ar_cr <- merge(ar,cr, by="ID")
+
+
+ar_cr$AGE <- abs(ar_cr$AGE) 
+
+ar_cr$emp_length <- abs(ar_cr$emp_length) 
+
+unique(ar_cr$FLAG_MOBIL) 
+
+ar_cr <- ar_cr %>% subset(select = -FLAG_MOBIL) 
+
+ 
+
+head(ar_cr) 
+```
+
+
+
+```{r}
+IndividualIDS <- ar_cr %>%
+    distinct(ID, CODE_GENDER)
+
+ggplot(IndividualIDS, aes(x=CODE_GENDER, fill=CODE_GENDER)) + geom_bar() + scale_fill_manual("Gender", values = c("F" = "pink", "M" = "blue")) + ggtitle("Number of Females and Males in the Dataset") + geom_text(stat='count', aes(label=..count..))
+
+# histogram displaying total number of records of each status 
+ggplot(ar_cr, aes(x=STATUS,y = ..count..), stat = "count") + geom_bar(aes(fill= STATUS)) + ggtitle("Number of Records for Each Status") + xlab("Status") + geom_text(aes(label = ..count..), stat = "count", vjust=-0.5) + scale_fill_brewer(palette = "Pastel1")
+
+# creating the histogram that displays the average credit history length of the dataset
+#hist(AvgCreditHistory$avgMonthsBalance, main = "Average Credit History for All Applicants", xlab = "Average Months Balance", col = "royalblue3")
+
+
+```
+
+
+
+```{r}
+# creating bar graph comparing the months balance for each credit status by education level to see what level of education people with good vs bad credit have
+ar_cr %>%  ggplot() + geom_bar(aes(x= NAME_EDUCATION_TYPE, y= MONTHS_BALANCE, fill= STATUS), stat ="identity", position = "dodge") + scale_y_reverse() + scale_fill_brewer(palette = "PRGn") + ggtitle("Avg Months Balance for Each Credit Status by Education Level") + xlab("Education Level") + ylab("Avg Months Balance")
+
+#looking into average credit of each status group, first create matrix for each then graphs 
+StatusC <- ar_cr %>%
+  filter(STATUS == "C")
+crC <- StatusC %>%
+  group_by(ID) %>%
+  select(MONTHS_BALANCE) %>%
+  summarise(avgMonthsBalance = mean(MONTHS_BALANCE))
+ 
+hist(crC$avgMonthsBalance, main="Avg Months Balance of Status C Applicants", xlab="Avg Months Balance", col="green")
+
+```
+
+
+
+```{r}
+
+ ar_cr  %>% select(MONTHS_BALANCE) %>%
+  summarise(avgMonthsBalance = mean(MONTHS_BALANCE))
+
+StatusX <- ar_cr %>%
+  filter(STATUS == "X")
+cr5 <- StatusX %>%
+  group_by(ID) %>%
+  select(MONTHS_BALANCE) %>%
+  summarise(avgMonthsBalance = mean(MONTHS_BALANCE))
+ 
+hist(cr5$avgMonthsBalance, main="Avg Months Balance of Status X Applicants", xlab="Avg Months Balance", col="tomato")
+
+Status0 <- ar_cr %>%
+  filter(STATUS == "0")
+
+
+ 
+
+Status1 <- ar_cr %>%
+  filter(STATUS == "1")
+cr1 <- Status1 %>%
+  group_by(ID) %>%
+  select(MONTHS_BALANCE) %>%
+  summarise(avgMonthsBalance = mean(MONTHS_BALANCE))
+ 
+hist(cr1$avgMonthsBalance, main="Avg Months Balance of Status 1 Applicants", xlab="Avg Months Balance", col="tomato")
+Status5 <- ar_cr %>%
+  filter(STATUS == "1")
+cr1 <- Status1 %>%
+  group_by(ID) %>%
+  select(MONTHS_BALANCE) %>%
+  summarise(avgMonthsBalance = mean(MONTHS_BALANCE))
+cr5 <- Status5 %>%
+  group_by(ID) %>%
+  select(MONTHS_BALANCE) %>%
+  summarise(avgMonthsBalance = mean(MONTHS_BALANCE))
+ 
+hist(cr1$avgMonthsBalance, main="Avg Months Balance of Status 1 Applicants", xlab="Avg Months Balance", col="tomato")
+
+Status2 <- ar_cr %>%
+  filter(STATUS == "5")
+cr2 <- Status2 %>%
+  group_by(ID) %>%
+  select(MONTHS_BALANCE) %>%
+  summarise(avgMonthsBalance = mean(MONTHS_BALANCE))
+ 
+hist(cr2$avgMonthsBalance, main="Avg Months Balance of Status 2 Applicants", xlab="Avg Months Balance", col="tomato")
+
+Status3 <- ar_cr %>%
+  filter(STATUS == "3")
+cr3 <- Status3 %>%
+  group_by(ID) %>%
+  select(MONTHS_BALANCE) %>%
+  summarise(avgMonthsBalance = mean(MONTHS_BALANCE))
+ 
+hist(cr3$avgMonthsBalance, main="Avg Months Balance of Status 3 Applicants", xlab="Avg 
+Months Balance", col="tomato")
+
+Status4 <- ar_cr %>%
+  filter(STATUS == "3")
+cr4 <- Status4 %>%
+  group_by(ID) %>%
+  select(MONTHS_BALANCE) %>%
+  summarise(avgMonthsBalance = mean(MONTHS_BALANCE))
+ 
+hist(cr4$avgMonthsBalance, main="Avg Months Balance of Status 4 Applicants", xlab="Avg Months Balance", col="tomato")
+
+Status5 <- ar_cr %>%
+  filter(STATUS == "5")
+cr5 <- Status5 %>%
+  group_by(ID) %>%
+  select(MONTHS_BALANCE) %>%
+  summarise(avgMonthsBalance = mean(MONTHS_BALANCE))
+ 
+hist(cr5$avgMonthsBalance, main="Avg Months Balance of Status 5 Applicants", xlab="Avg Months Balance", col="tomato")
+
+
+
+```
+
+```{r}
+########DELETE IF NOT NEEDED########
+ 
+hist(cr3$avgMonthsBalance, main="Avg Months Balance of Status 3 Applicants", xlab="Avg 
+Months Balance", col="tomato")
+
+Status4 <- ar_cr %>%
+  filter(STATUS == "3")
+cr4 <- Status4 %>%
+  group_by(ID) %>%
+  select(MONTHS_BALANCE) %>%
+  summarise(avgMonthsBalance = mean(MONTHS_BALANCE))
+ 
+hist(cr4$avgMonthsBalance, main="Avg Months Balance of Status 4 Applicants", xlab="Avg Months Balance", col="tomato")
+
+Status5 <- ar_cr %>%
+  filter(STATUS == "5")
+cr5 <- Status5 %>%
+  group_by(ID) %>%
+  select(MONTHS_BALANCE) %>%
+  summarise(avgMonthsBalance = mean(MONTHS_BALANCE))
+ 
+hist(cr5$avgMonthsBalance, main="Avg Months Balance of Status 5 Applicants", xlab="Avg Months Balance", col="tomato")
+
+#boxplot of ages of the status 
+ggplot(ar_cr, aes(group = STATUS, x = STATUS, y = AGE, fill = STATUS)) + geom_boxplot() + coord_flip() + ggtitle("Distribution of Age Grouped by Status ") + scale_fill_brewer(palette = "Pastel1")
+
+#looked at boxplot of Employment time
+ggplot(ar_cr,  aes(group = STATUS, x = STATUS, y = emp_length, fill = STATUS)) + geom_boxplot() + coord_flip() + ggtitle("Distribution of Employment Grouped by Status ") + scale_fill_brewer(palette = "Pastel1")
+
+########DELETE IF NOT NEEDED########
+
+
+```
+
+
+
+```{r}
+#boxplot of ages of the status 
+ggplot(ar_cr, aes(group = STATUS, x = STATUS, y = AGE, fill = STATUS)) + geom_boxplot() + coord_flip() + ggtitle("Distribution of Age Grouped by Status ") + scale_fill_brewer(palette = "Pastel1")
+
+
+
+#broke employment length into two groups
+Employed <- ar_cr %>%
+  filter(emp_length > 0)
+Unemployed <- ar_cr %>%
+  filter(emp_length <= 0)
+
+
+
+ggplot(Unemployed, aes(group = STATUS, x = STATUS, y = emp_length, fill = STATUS)) + geom_boxplot() + coord_flip() + ggtitle("Distribution of Employment Grouped by Status ") + scale_fill_brewer(palette = "Pastel1")
+
+```
+
+
+
+
+```{r}
+#Good vs Bad Candidates Selection
+
+
+good_candidates <- ar_cr %>%  filter(status_level == 0 | status_level == 1 )
+
+bad_candidates <- ar_cr %>%  filter(status_level == 2 | status_level == 3 | status_level == 4 |status_level == 5 |status_level == 6)
+
+
+
+
+
+
+
+```
+```{r}
+#Creates a summary table that shows what the worst level of delinquency each person reached, then generates a pie chart of the results: 
+
+highest_dlq <- cr %>% group_by(ID) %>% summarize(max_dlq=max(status_level)) 
+
+highest_dlq_pie <- highest_dlq %>% group_by(max_dlq) %>% summarize(count=n()) 
+
+  
+
+highest_dlq_pie$labels <- highest_dlq_pie$max_dlq - 1 
+
+highest_dlq_pie$labels <- replace(highest_dlq_pie$labels, highest_dlq_pie$labels<0, "X/C") 
+
+highest_dlq_pie$labels <- factor(highest_dlq_pie$labels, levels=c("X/C", "0", "1", "2", "3", "4", "5")) 
+
+  
+
+ggplot(highest_dlq_pie, aes(x="", y=count, fill=labels)) +  
+
+  geom_bar(stat="identity", width=1) +  
+
+  coord_polar("y", start=0) + 
+
+
+  guides(fill=guide_legend(title="Delinquency Status \n(Lower is Better)")) + 
+
+  theme(axis.title.x=element_blank(), axis.title.y=element_blank()) + 
+
+  ggtitle("Worst Delinquency Level Reached") 
+
+  
+
+# Creates a data table with the percentages in each of the highest dlq buckets. 
+
+select(highest_dlq_pie, labels, count) %>% mutate(percent=scales::percent(round(count/sum(count), 3))) 
+
+ 
+
+ 
+
+# Creates a dataframe of where each person's worst delinquency level was, and where their last observation was. 
+
+status_df <- sqldf("SELECT cr.ID, cr.MONTHS_BALANCE, cr.STATUS, cr.status_level, highest_dlq.max_dlq  
+
+                      FROM cr  
+
+                      INNER JOIN highest_dlq ON cr.ID = highest_dlq.ID 
+
+                      WHERE MONTHS_BALANCE = 0") 
+
+  
+
+status_df <- status_df %>% group_by(max_dlq, STATUS) %>% summarize(Observations=n()) 
+
+  
+
+  
+
+# Change the labels for the x-axis from numeric to their actual names 
+
+status_df$xlabels <- status_df$max_dlq - 1 
+
+status_df$xlabels <- replace(status_df$xlabels, status_df$xlabels<0, "X/C") 
+
+status_df$xlabels <- factor(status_df$xlabels, levels=c("X/C", "0", "1", "2", "3", "4", "5")) 
+
+  
+
+  
+
+#Make the stacked bar chart 
+
+ggplot(status_df) +  
+
+  aes(fill=STATUS, y=Observations, x=xlabels) + 
+
+  geom_col(position="fill", stat="identity", palette = "Pastel1") + 
+
+
+
+  ylab("Percentage of Cohort") + 
+
+  guides(fill=guide_legend(title="Final Status \n(Lower is Better)")) + 
+
+  xlab("(<-- Better) Worst level of Delinquency Reached (Worse -->)") + 
+
+  ggtitle("Breakdown of Final Observation Based on \nHighest Delinquency Level Reached") 
+
+
+
+```
+```{r}
+df <- good_candidates %>%  
+
+  group_by(FLAG_OWN_REALTY, FLAG_OWN_CAR) %>%  
+
+  summarize(count=n()) 
+
+df$FLAG_OWN_REALTY[df$FLAG_OWN_REALTY=="N"]<-"No realty" 
+
+df$FLAG_OWN_REALTY[df$FLAG_OWN_REALTY=="Y"]<-"Realty" 
+
+df$FLAG_OWN_CAR[df$FLAG_OWN_CAR=="N"]<-"No car" 
+
+df$FLAG_OWN_CAR[df$FLAG_OWN_CAR=="Y"]<-"Car" 
+
+df <- df %>% mutate(Ownership=paste(FLAG_OWN_REALTY, FLAG_OWN_CAR, sep = " / ")) 
+
+df %>% ggplot(aes(x="", y=count, fill=Ownership)) +  
+
+  geom_bar(stat="identity", width=1) +  
+
+  coord_polar("y", start=0) + 
+
+  ggtitle("Ownership Breakdown of 'Good' Payers") 
+
+  
+
+df <- bad_candidates %>%  
+
+  group_by(FLAG_OWN_REALTY, FLAG_OWN_CAR) %>%  
+
+  summarize(count=n()) 
+
+df$FLAG_OWN_REALTY[df$FLAG_OWN_REALTY=="N"]<-"No realty" 
+
+df$FLAG_OWN_REALTY[df$FLAG_OWN_REALTY=="Y"]<-"Realty" 
+
+df$FLAG_OWN_CAR[df$FLAG_OWN_CAR=="N"]<-"No car" 
+
+df$FLAG_OWN_CAR[df$FLAG_OWN_CAR=="Y"]<-"Car" 
+
+df <- df %>% mutate(Ownership=paste(FLAG_OWN_REALTY, FLAG_OWN_CAR, sep = " / ")) 
+
+df %>% ggplot(aes(x="", y=count, fill=Ownership)) +  
+
+  geom_bar(stat="identity", width=1) +  
+
+  coord_polar("y", start=0) + 
+
+  ggtitle("Ownership Breakdown of 'Bad' Payers") 
+
+ 
+```
+
+```{r}
+#create new DF to use in model
+
+prediction_df <- data.frame(gender = as.factor(ar_cr$CODE_GENDER),
+                            income = ar_cr$AMT_INCOME_TOTAL,
+                            age = ar_cr$AGE,
+                            Employment = ar_cr$emp_length,
+                            candidate_state = as.factor(ar_cr$candidate))
+```
+
+
+```{r}
+
+#build a decision tree model
+set.seed(111)
+
+training1 <- createDataPartition(y=prediction_df$candidate_state,p=.70,list=FALSE)
+train <- prediction_df[training1,]
+test <- prediction_df[-training1,]
+
+dim(train)
+dim(test)
+
+train
+```
+
+
+```{r}
+model.rpart <- rpart(candidate_state ~ ., data = train,
+method = "class")
+```
+
+```{r}
+rpart.plot(model.rpart)
+
+```
+```{r}
+rpart <- predict(model.rpart, newdata = test,type = "class")
+confusion_rpart <- confusionMatrix(rpart, test$candidate_state)
+confusion_rpart
+confusion_rpart$overall[1]
+```
+
+
+```{r}
+#tried another model but it would not execute 
+svm
+svm.model <- train(candidate_state ~ ., data = train,
+method = "svmRadial",
+trControl=trainControl(method = "none"),
+preProcess = c("center", "scale"))
+
+
+
+
+```
